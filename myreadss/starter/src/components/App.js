@@ -1,0 +1,71 @@
+import "../App.css";
+import { useEffect, useState } from "react";
+import * as BooksAPI from "./BooksAPI";
+import { Routes, Route } from "react-router-dom";
+import BookMainShelfList from "./BookMainShelfList";
+import BookMainSearch from "./BookMainSearch";
+
+function App() {
+  const [books, setBooks] = useState([])
+
+  useEffect(() => {
+    const getBooks = async () => {
+      const res = await BooksAPI.getAll();
+      setBooks(res);
+    };
+    getBooks();
+  }, []);
+
+  const onShelfChange = (book, shelf) => {
+    const addOrUpdateBook = (book, shelf) => {
+      let isBookOnShelf = false
+      const updatedBooks = books.map((b) => {
+        if (b.id === book.id) {
+          isBookOnShelf = true
+          return {
+            ...b,
+            shelf: shelf
+          }
+        }
+        return b
+      })
+
+      // Optimistic update
+      if (isBookOnShelf) {
+        setBooks(updatedBooks)
+      } else {
+        setBooks([
+          ...books, {
+            ...book,
+            shelf: shelf
+          }
+        ])
+      }
+
+      // Update on server, rollback on failure
+      BooksAPI.update(book, shelf).catch((error) => {
+        console.error("Request failed, reverting UI state.")
+        setBooks(books)
+        throw error
+      })
+    }
+    addOrUpdateBook(book, shelf)
+  }
+
+  return (
+    <div className="app">
+      <Routes>
+        <Route
+          exact
+          path="/"
+          element={
+            <BookMainShelfList books={books} onShelfChange={onShelfChange} />
+          }
+        />
+        <Route path="/search" element={<BookMainSearch books={books} onShelfChange={onShelfChange} />} />
+      </Routes>
+    </div>
+  );
+}
+
+export default App;
